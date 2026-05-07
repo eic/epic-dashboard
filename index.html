@@ -95,7 +95,12 @@
       text-align: right;
       margin-top: 0.5rem;
     }
-    .placeholder {
+    .stat-card .trend {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-left: 0.4rem;
+    }
       color: var(--muted);
       font-size: 0.9rem;
       padding: 3rem;
@@ -151,6 +156,21 @@ function fmtDate(iso) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/**
+ * Compare `current` against the average of the last `n` entries in `series`
+ * (excluding the final entry which represents the current week).
+ * Returns an HTML string like "↑ 6" or "↓ 3" in a muted style.
+ */
+function trendBadge(series, current, n = 5) {
+  if (!series?.length || current == null) return '';
+  const window = series.slice(-(n + 1), -1);
+  if (!window.length) return '';
+  const avg = window.reduce((a, b) => a + b, 0) / window.length;
+  const delta = Math.round((current - avg) * 10) / 10;
+  if (delta === 0) return '';
+  const arrow = delta > 0 ? '↑' : '↓';
+  return `<span class="trend">${arrow} ${Math.abs(delta).toLocaleString()}</span>`;
+}
 
 function buildProjectCharts(data) {
   const container = document.getElementById('charts-container');
@@ -166,15 +186,15 @@ function buildProjectCharts(data) {
         <div class="stats-grid" style="margin-bottom:1.25rem">
           <div class="stat-card">
             <div class="label">Open Issues</div>
-            <div class="value" style="color:${color}">${(d.current_open_issues ?? '—').toLocaleString()}</div>
+            <div class="value" style="color:${color}">${(d.current_open_issues ?? '—').toLocaleString()}${trendBadge(d.open_issues, d.current_open_issues)}</div>
           </div>
           <div class="stat-card">
             <div class="label">Open Pull Requests</div>
-            <div class="value" style="color:${color}">${(d.current_open_prs ?? '—').toLocaleString()}</div>
+            <div class="value" style="color:${color}">${(d.current_open_prs ?? '—').toLocaleString()}${trendBadge(d.open_prs, d.current_open_prs)}</div>
           </div>
           <div class="stat-card">
             <div class="label">Commits This Week</div>
-            <div class="value" style="color:${color}">${(d.current_week_commits ?? '—').toLocaleString()}</div>
+            <div class="value" style="color:${color}">${(d.current_week_commits ?? '—').toLocaleString()}${trendBadge(d.commits_per_week, d.current_week_commits)}</div>
           </div>
         </div>
         <div class="project-charts">
