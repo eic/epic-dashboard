@@ -146,7 +146,7 @@
       6
     ],
     "current_week_commits": 6,
-    "updated_at": "2026-05-07T16:03:22.202350Z"
+    "updated_at": "2026-05-07T16:05:51.565244Z"
   },
   "eic/EICrecon": {
     "dates": [
@@ -295,7 +295,7 @@
       7
     ],
     "current_week_commits": 7,
-    "updated_at": "2026-05-07T16:03:22.202522Z"
+    "updated_at": "2026-05-07T16:05:51.565288Z"
   },
   "eic/containers": {
     "dates": [
@@ -444,7 +444,7 @@
       6
     ],
     "current_week_commits": 6,
-    "updated_at": "2026-05-07T16:03:22.202629Z"
+    "updated_at": "2026-05-07T16:05:51.565316Z"
   },
   "eic/detector_benchmarks": {
     "dates": [
@@ -593,7 +593,7 @@
       2
     ],
     "current_week_commits": 2,
-    "updated_at": "2026-05-07T16:03:22.202762Z"
+    "updated_at": "2026-05-07T16:05:51.565343Z"
   },
   "eic/physics_benchmarks": {
     "dates": [
@@ -742,6 +742,6 @@
       3
     ],
     "current_week_commits": 3,
-    "updated_at": "2026-05-07T16:03:22.202877Z"
+    "updated_at": "2026-05-07T16:05:51.565389Z"
   }
 }
