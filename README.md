@@ -1,4 +1,4 @@
-# EIC GitHub Dashboard
+# EIC/ePIC GitHub Dashboard
 
 A lightweight GitHub Pages dashboard tracking issue, pull-request, and commit
 activity for key [EIC](https://www.eicug.org/) software repositories.
