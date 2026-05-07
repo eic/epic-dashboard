@@ -101,11 +101,29 @@
       color: var(--muted);
       margin-left: 0.4rem;
     }
-      color: var(--muted);
-      font-size: 0.9rem;
-      padding: 3rem;
-      text-align: center;
+    .tab-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.5rem;
     }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -1px;
+      padding: 0.6rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 4px 4px 0 0;
+      transition: color 0.15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--text); }
+    .repo-section { display: none; }
     .error-box {
       color: var(--red);
       background: rgba(248,81,73,0.08);
@@ -131,6 +149,7 @@
   </p>
 </header>
 
+<nav id="tab-bar" class="tab-bar"></nav>
 <div id="charts-container"></div>
 
 <footer id="footer"></footer>
@@ -172,54 +191,104 @@ function trendBadge(series, current, n = 5) {
   return `<span class="trend">${arrow} ${Math.abs(delta).toLocaleString()}</span>`;
 }
 
-function buildProjectCharts(data) {
-  const container = document.getElementById('charts-container');
-  for (const [repo, d] of Object.entries(data)) {
-    if (!d.dates?.length) continue;
-    const repoId = repo.replace(/\//g, '-');
-    const color = REPO_COLORS[repo] || '#58a6ff';
-    container.insertAdjacentHTML('beforeend', `
-      <div class="chart-section">
-        <h2><a href="https://github.com/${repo}" style="color:${color}">${repo}</a>
-          <span style="font-weight:400;color:var(--muted);font-size:0.8rem">&nbsp;— weekly snapshots, past 6 months</span>
-        </h2>
-        <div class="stats-grid" style="margin-bottom:1.25rem">
-          <div class="stat-card">
-            <div class="label">Open Issues</div>
-            <div class="value" style="color:${color}">${(d.current_open_issues ?? '—').toLocaleString()}${trendBadge(d.open_issues, d.current_open_issues)}</div>
-          </div>
-          <div class="stat-card">
-            <div class="label">Open Pull Requests</div>
-            <div class="value" style="color:${color}">${(d.current_open_prs ?? '—').toLocaleString()}${trendBadge(d.open_prs, d.current_open_prs)}</div>
-          </div>
-          <div class="stat-card">
-            <div class="label">Commits This Week</div>
-            <div class="value" style="color:${color}">${(d.current_week_commits ?? '—').toLocaleString()}${trendBadge(d.commits_per_week, d.current_week_commits)}</div>
-          </div>
-        </div>
-        <div class="project-charts">
-          <div>
-            <div class="chart-subtitle">📈 Open Issues Over Time</div>
-            <div class="chart-wrapper"><canvas id="${repoId}-issues-chart"></canvas></div>
-          </div>
-          <div>
-            <div class="chart-subtitle">🔀 Open Pull Requests Over Time</div>
-            <div class="chart-wrapper"><canvas id="${repoId}-prs-chart"></canvas></div>
-          </div>
-        </div>
-        ${d.commit_weeks?.length ? `
-        <div style="margin-top:1.25rem">
-          <div class="chart-subtitle">📦 Commits Per Week</div>
-          <div class="chart-wrapper"><canvas id="${repoId}-commits-chart"></canvas></div>
-        </div>` : ''}
-      </div>
-    `);
+// Repos whose charts have been rendered (lazy — only when tab first shown).
+const renderedTabs = new Set();
+// Pending chart data keyed by repoId.
+const pendingCharts = {};
+
+function activateTab(repoId) {
+  // Show/hide sections
+  document.querySelectorAll('.repo-section').forEach(s => s.style.display = 'none');
+  const section = document.getElementById(`section-${repoId}`);
+  if (section) section.style.display = '';
+
+  // Update tab button styles
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const isActive = btn.dataset.repoId === repoId;
+    btn.classList.toggle('active', isActive);
+    btn.style.borderBottomColor = isActive ? btn.dataset.color : 'transparent';
+    btn.style.color = isActive ? btn.dataset.color : '';
+  });
+
+  // Lazy-render charts the first time a tab is shown
+  if (!renderedTabs.has(repoId) && pendingCharts[repoId]) {
+    const { repo, d } = pendingCharts[repoId];
     buildChart(`${repoId}-issues-chart`, { [repo]: d }, 'open_issues');
     buildChart(`${repoId}-prs-chart`, { [repo]: d }, 'open_prs');
-    if (d.commit_weeks?.length) {
-      buildCommitsChart(`${repoId}-commits-chart`, repo, d);
-    }
+    if (d.commit_weeks?.length) buildCommitsChart(`${repoId}-commits-chart`, repo, d);
+    renderedTabs.add(repoId);
   }
+
+  localStorage.setItem('epic-dashboard-tab', repoId);
+}
+
+function buildDashboard(data) {
+  const tabBar   = document.getElementById('tab-bar');
+  const container = document.getElementById('charts-container');
+  const repos = Object.entries(data).filter(([, d]) => d.dates?.length);
+
+  for (const [repo, d] of repos) {
+    const repoId = repo.replace(/\//g, '-');
+    const color  = REPO_COLORS[repo] || '#58a6ff';
+    const label  = repo.split('/')[1];   // drop the "eic/" prefix in the tab
+
+    // Tab button
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.textContent = label;
+    btn.dataset.repoId = repoId;
+    btn.dataset.color  = color;
+    btn.addEventListener('click', () => activateTab(repoId));
+    tabBar.appendChild(btn);
+
+    // Section HTML (hidden until activated)
+    container.insertAdjacentHTML('beforeend', `
+      <div id="section-${repoId}" class="repo-section">
+        <div class="chart-section">
+          <h2>
+            <a href="https://github.com/${repo}" style="color:${color}">${repo}</a>
+            <span style="font-weight:400;color:var(--muted);font-size:0.8rem">&nbsp;— weekly snapshots, past 6 months</span>
+          </h2>
+          <div class="stats-grid" style="margin-bottom:1.25rem">
+            <div class="stat-card">
+              <div class="label">Open Issues</div>
+              <div class="value" style="color:${color}">${(d.current_open_issues ?? '—').toLocaleString()}${trendBadge(d.open_issues, d.current_open_issues)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Open Pull Requests</div>
+              <div class="value" style="color:${color}">${(d.current_open_prs ?? '—').toLocaleString()}${trendBadge(d.open_prs, d.current_open_prs)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Commits This Week</div>
+              <div class="value" style="color:${color}">${(d.current_week_commits ?? '—').toLocaleString()}${trendBadge(d.commits_per_week, d.current_week_commits)}</div>
+            </div>
+          </div>
+          <div class="project-charts">
+            <div>
+              <div class="chart-subtitle">📈 Open Issues Over Time</div>
+              <div class="chart-wrapper"><canvas id="${repoId}-issues-chart"></canvas></div>
+            </div>
+            <div>
+              <div class="chart-subtitle">🔀 Open Pull Requests Over Time</div>
+              <div class="chart-wrapper"><canvas id="${repoId}-prs-chart"></canvas></div>
+            </div>
+          </div>
+          ${d.commit_weeks?.length ? `
+          <div style="margin-top:1.25rem">
+            <div class="chart-subtitle">📦 Commits Per Week</div>
+            <div class="chart-wrapper"><canvas id="${repoId}-commits-chart"></canvas></div>
+          </div>` : ''}
+        </div>
+      </div>
+    `);
+
+    pendingCharts[repoId] = { repo, d };
+  }
+
+  // Restore saved tab, or default to first
+  const saved = localStorage.getItem('epic-dashboard-tab');
+  const ids   = repos.map(([r]) => r.replace(/\//g, '-'));
+  activateTab(ids.includes(saved) ? saved : ids[0]);
 }
 
 function buildChart(canvasId, data, key) {
@@ -294,7 +363,7 @@ function buildCommitsChart(canvasId, repo, d) {
       return;
     }
 
-    buildProjectCharts(data);
+    buildDashboard(data);
 
     if (firstRepo.updated_at) {
       document.getElementById('footer').textContent =
