@@ -85,10 +85,10 @@
       43,
       41,
       48,
-      46
+      45
     ],
     "current_open_issues": 72,
-    "current_open_prs": 46,
+    "current_open_prs": 45,
     "commit_weeks": [
       "2025-11-06",
       "2025-11-13",
@@ -146,7 +146,7 @@
       6
     ],
     "current_week_commits": 6,
-    "updated_at": "2026-05-07T16:05:51.565244Z"
+    "updated_at": "2026-05-07T16:23:09.318786Z"
   },
   "eic/EICrecon": {
     "dates": [
@@ -295,7 +295,7 @@
       7
     ],
     "current_week_commits": 7,
-    "updated_at": "2026-05-07T16:05:51.565288Z"
+    "updated_at": "2026-05-07T16:23:09.318875Z"
   },
   "eic/containers": {
     "dates": [
@@ -444,7 +444,7 @@
       6
     ],
     "current_week_commits": 6,
-    "updated_at": "2026-05-07T16:05:51.565316Z"
+    "updated_at": "2026-05-07T16:23:09.318933Z"
   },
   "eic/detector_benchmarks": {
     "dates": [
@@ -593,7 +593,7 @@
       2
     ],
     "current_week_commits": 2,
-    "updated_at": "2026-05-07T16:05:51.565343Z"
+    "updated_at": "2026-05-07T16:23:09.318981Z"
   },
   "eic/physics_benchmarks": {
     "dates": [
@@ -742,6 +742,6 @@
       3
     ],
     "current_week_commits": 3,
-    "updated_at": "2026-05-07T16:05:51.565389Z"
+    "updated_at": "2026-05-07T16:23:09.319037Z"
   }
 }
