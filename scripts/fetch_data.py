@@ -25,7 +25,6 @@ REPOS = [
 ]
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GRAPHQL_URL = "https://api.github.com/graphql"
-REST_URL = "https://api.github.com"
 # Keep each batch well under GitHub's per-request complexity limit.
 # 50 search aliases × ~7 pts each ≈ 350 pts (limit is 500 000).
 BATCH_SIZE = 50
@@ -73,33 +72,41 @@ def fetch_counts(aliases_and_queries: list[tuple[str, str]]) -> dict[str, int]:
 
 
 # ---------------------------------------------------------------------------
-# Commit activity (REST API)
+# Commit counts (GraphQL — one query per repo with 26 week-range aliases)
 # ---------------------------------------------------------------------------
 
-def fetch_commit_activity(repo: str, weeks: int = 26) -> tuple[list[str], list[int]]:
+def fetch_commit_counts(repos: list[str], dates: list[str]) -> dict[str, list[int]]:
     """
-    Fetch weekly commit counts from GitHub's stats API.
-    Returns (iso_dates, commit_counts) for the last `weeks` weeks.
-    The API may return HTTP 202 while it computes stats; we retry up to 5 times.
+    Count commits on the default branch per weekly interval using GraphQL.
+    dates: 27-entry list from weekly_dates(26); intervals are dates[i]→dates[i+1].
+    Returns {repo: [count_w0, ..., count_w25]}.
     """
-    url = f"{REST_URL}/repos/{repo}/stats/commit_activity"
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Bearer {GITHUB_TOKEN}")
-    req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    for attempt in range(5):
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            raw = resp.read()
-            if resp.status == 202 or not raw.strip():
-                print(f"  [{repo}] commit stats not ready, retrying ({attempt+1}/5)…")
-                time.sleep(5)
-                continue
-            activity = json.loads(raw)
-            tail = activity[-weeks:]
-            iso_dates = [date.fromtimestamp(w["week"]).isoformat() for w in tail]
-            counts = [w["total"] for w in tail]
-            return iso_dates, counts
-    print(f"  WARNING: could not fetch commit activity for {repo}")
-    return [], []
+    intervals = [(dates[i], dates[i + 1]) for i in range(len(dates) - 1)]
+    results: dict[str, list[int]] = {}
+    for repo in repos:
+        owner, name = repo.split("/")
+        history_parts = "\n          ".join(
+            f'w{i}: history(since: "{s}T00:00:00Z", until: "{e}T00:00:00Z") {{ totalCount }}'
+            for i, (s, e) in enumerate(intervals)
+        )
+        gql = f"""{{
+  repository(owner: {json.dumps(owner)}, name: {json.dumps(name)}) {{
+    defaultBranchRef {{
+      target {{
+        ... on Commit {{
+          {history_parts}
+        }}
+      }}
+    }}
+  }}
+}}"""
+        print(f"  {repo} … ", end="", flush=True)
+        data = graphql_request(gql)
+        target = data["repository"]["defaultBranchRef"]["target"]
+        counts = [target[f"w{i}"]["totalCount"] for i in range(len(intervals))]
+        results[repo] = counts
+        print(f"{sum(counts)} total commits in last 26 weeks")
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -150,8 +157,9 @@ def build_queries(repos: list[str], dates: list[str]) -> list[tuple[str, str]]:
 
 
 def assemble(repos: list[str], dates: list[str], counts: dict[str, int],
-             commit_data: dict[str, tuple[list[str], list[int]]]) -> dict:
+             commit_counts: dict[str, list[int]]) -> dict:
     result: dict = {}
+    commit_weeks = dates[:-1]   # 26 week-start labels matching the 26 commit buckets
     for repo in repos:
         rk = repo_key(repo)
         open_issues = [
@@ -162,17 +170,17 @@ def assemble(repos: list[str], dates: list[str], counts: dict[str, int],
             counts[f"{rk}_pr_open_{i}"] + counts[f"{rk}_pr_closed_{i}"]
             for i in range(len(dates))
         ]
-        commit_weeks, commits_per_week = commit_data.get(repo, ([], []))
+        cph = commit_counts.get(repo, [])
         result[repo] = {
-            "dates":               dates,
-            "open_issues":         open_issues,
-            "open_prs":            open_prs,
-            "current_open_issues": counts[f"{rk}_issue_current"],
-            "current_open_prs":    counts[f"{rk}_pr_current"],
-            "commit_weeks":        commit_weeks,
-            "commits_per_week":    commits_per_week,
-            "current_week_commits": commits_per_week[-1] if commits_per_week else 0,
-            "updated_at":          datetime.utcnow().isoformat() + "Z",
+            "dates":                dates,
+            "open_issues":          open_issues,
+            "open_prs":             open_prs,
+            "current_open_issues":  counts[f"{rk}_issue_current"],
+            "current_open_prs":     counts[f"{rk}_pr_current"],
+            "commit_weeks":         commit_weeks,
+            "commits_per_week":     cph,
+            "current_week_commits": cph[-1] if cph else 0,
+            "updated_at":           datetime.utcnow().isoformat() + "Z",
         }
     return result
 
@@ -187,14 +195,10 @@ def main() -> None:
     print(f"Fetching {len(queries)} counts across {-(-len(queries) // BATCH_SIZE)} batches …")
     counts = fetch_counts(queries)
 
-    print("Fetching weekly commit activity …")
-    commit_data: dict[str, tuple[list[str], list[int]]] = {}
-    for repo in REPOS:
-        print(f"  {repo} … ", end="", flush=True)
-        commit_data[repo] = fetch_commit_activity(repo)
-        print(f"{sum(commit_data[repo][1])} total commits in last 26 weeks")
+    print("Fetching weekly commit counts via GraphQL …")
+    commit_counts = fetch_commit_counts(REPOS, dates)
 
-    all_data = assemble(REPOS, dates, counts, commit_data)
+    all_data = assemble(REPOS, dates, counts, commit_counts)
 
     os.makedirs("data", exist_ok=True)
     out = "data/dashboard.json"
