@@ -114,11 +114,14 @@
 <body>
 
 <header>
-  <h1>🚀 Spack GitHub Dashboard</h1>
+  <h1>🚀 EIC GitHub Dashboard</h1>
   <p>
-    Issue and pull-request trends for
-    <a href="https://github.com/eic/epic">eic/epic</a> and
-    <a href="https://github.com/eic/EICrecon">eic/EICrecon</a> —
+    Issue, pull-request, and commit trends for
+    <a href="https://github.com/eic/epic">eic/epic</a>,
+    <a href="https://github.com/eic/EICrecon">eic/EICrecon</a>,
+    <a href="https://github.com/eic/containers">eic/containers</a>,
+    <a href="https://github.com/eic/detector_benchmarks">eic/detector_benchmarks</a>, and
+    <a href="https://github.com/eic/physics_benchmarks">eic/physics_benchmarks</a> —
     updated weekly via GitHub Actions.
   </p>
 </header>
@@ -133,8 +136,11 @@
 
 <script>
 const REPO_COLORS = {
-  'eic/epic':     '#58a6ff',
-  'eic/EICrecon': '#f0883e',
+  'eic/epic':                  '#58a6ff',
+  'eic/EICrecon':              '#f0883e',
+  'eic/containers':            '#3fb950',
+  'eic/detector_benchmarks':   '#a371f7',
+  'eic/physics_benchmarks':    '#f78166',
 };
 
 const SCALE_OPTS = {
@@ -165,6 +171,11 @@ function renderStats(data) {
         <div class="value" style="color:${c}">${(d.current_open_prs ?? '—').toLocaleString()}</div>
         <div class="repo">${repo}</div>
       </div>
+      <div class="stat-card">
+        <div class="label">Commits This Week</div>
+        <div class="value" style="color:${c}">${(d.current_week_commits ?? '—').toLocaleString()}</div>
+        <div class="repo">${repo}</div>
+      </div>
     `);
   }
 }
@@ -190,10 +201,18 @@ function buildProjectCharts(data) {
             <div class="chart-wrapper"><canvas id="${repoId}-prs-chart"></canvas></div>
           </div>
         </div>
+        ${d.commit_weeks?.length ? `
+        <div style="margin-top:1.25rem">
+          <div class="chart-subtitle">📦 Commits Per Week</div>
+          <div class="chart-wrapper"><canvas id="${repoId}-commits-chart"></canvas></div>
+        </div>` : ''}
       </div>
     `);
     buildChart(`${repoId}-issues-chart`, { [repo]: d }, 'open_issues');
     buildChart(`${repoId}-prs-chart`, { [repo]: d }, 'open_prs');
+    if (d.commit_weeks?.length) {
+      buildCommitsChart(`${repoId}-commits-chart`, repo, d);
+    }
   }
 }
 
@@ -215,6 +234,31 @@ function buildChart(canvasId, data, key) {
   new Chart(document.getElementById(canvasId), {
     type: 'line',
     data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#e6edf3', boxWidth: 14 } } },
+      scales: SCALE_OPTS,
+    },
+  });
+}
+
+function buildCommitsChart(canvasId, repo, d) {
+  const color = REPO_COLORS[repo] || '#58a6ff';
+  new Chart(document.getElementById(canvasId), {
+    type: 'bar',
+    data: {
+      labels: d.commit_weeks.map(fmtDate),
+      datasets: [{
+        label: 'Commits',
+        data: d.commits_per_week,
+        backgroundColor: color + '99',
+        borderColor: color,
+        borderWidth: 1,
+        borderRadius: 3,
+      }],
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
