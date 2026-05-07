@@ -126,10 +126,6 @@
   </p>
 </header>
 
-<div id="stats-grid" class="stats-grid">
-  <div class="placeholder">Loading data…</div>
-</div>
-
 <div id="charts-container"></div>
 
 <footer id="footer"></footer>
@@ -155,30 +151,6 @@ function fmtDate(iso) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function renderStats(data) {
-  const grid = document.getElementById('stats-grid');
-  grid.innerHTML = '';
-  for (const [repo, d] of Object.entries(data)) {
-    const c = REPO_COLORS[repo] || '#58a6ff';
-    grid.insertAdjacentHTML('beforeend', `
-      <div class="stat-card">
-        <div class="label">Open Issues</div>
-        <div class="value" style="color:${c}">${(d.current_open_issues ?? '—').toLocaleString()}</div>
-        <div class="repo">${repo}</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Open Pull Requests</div>
-        <div class="value" style="color:${c}">${(d.current_open_prs ?? '—').toLocaleString()}</div>
-        <div class="repo">${repo}</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Commits This Week</div>
-        <div class="value" style="color:${c}">${(d.current_week_commits ?? '—').toLocaleString()}</div>
-        <div class="repo">${repo}</div>
-      </div>
-    `);
-  }
-}
 
 function buildProjectCharts(data) {
   const container = document.getElementById('charts-container');
@@ -191,6 +163,20 @@ function buildProjectCharts(data) {
         <h2><a href="https://github.com/${repo}" style="color:${color}">${repo}</a>
           <span style="font-weight:400;color:var(--muted);font-size:0.8rem">&nbsp;— weekly snapshots, past 6 months</span>
         </h2>
+        <div class="stats-grid" style="margin-bottom:1.25rem">
+          <div class="stat-card">
+            <div class="label">Open Issues</div>
+            <div class="value" style="color:${color}">${(d.current_open_issues ?? '—').toLocaleString()}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Open Pull Requests</div>
+            <div class="value" style="color:${color}">${(d.current_open_prs ?? '—').toLocaleString()}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Commits This Week</div>
+            <div class="value" style="color:${color}">${(d.current_week_commits ?? '—').toLocaleString()}</div>
+          </div>
+        </div>
         <div class="project-charts">
           <div>
             <div class="chart-subtitle">📈 Open Issues Over Time</div>
@@ -279,7 +265,7 @@ function buildCommitsChart(canvasId, repo, d) {
     const hasDates = firstRepo?.dates?.length > 0;
 
     if (!hasDates) {
-      document.getElementById('stats-grid').innerHTML = `
+      document.getElementById('charts-container').innerHTML = `
         <div class="error-box">
           Dashboard data has not been generated yet.<br>
           Check the <strong>Actions</strong> tab of this repository — the
@@ -288,7 +274,6 @@ function buildCommitsChart(canvasId, repo, d) {
       return;
     }
 
-    renderStats(data);
     buildProjectCharts(data);
 
     if (firstRepo.updated_at) {
@@ -296,7 +281,7 @@ function buildCommitsChart(canvasId, repo, d) {
         `Last updated: ${new Date(firstRepo.updated_at).toLocaleString()}`;
     }
   } catch (e) {
-    document.getElementById('stats-grid').innerHTML =
+    document.getElementById('charts-container').innerHTML =
       `<div class="error-box">Failed to load data/dashboard.json: ${e.message}</div>`;
   }
 })();
